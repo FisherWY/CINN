@@ -20,12 +20,12 @@ namespace frontend {
 namespace paddle_mappers {
 
 void FloorDivideOpMapper(const paddle::cpp::OpDesc& op_desc, const OpMapperContext& ctx) {
-  CHECK_EQ(op_desc.Input("x").size(), 1UL);
-  auto x_name = op_desc.Input("x").front();
-  CHECK_EQ(op_desc.Input("y").size(), 1UL);
-  auto y_name = op_desc.Input("y").front();
-  CHECK_EQ(op_desc.Output("out").size(), 1UL);
-  auto out_name = op_desc.Output("out").front();
+  CHECK_EQ(op_desc.Input("X").size(), 1UL);
+  auto x_name = op_desc.Input("X").front();
+  CHECK_EQ(op_desc.Input("Y").size(), 1UL);
+  auto y_name = op_desc.Input("Y").front();
+  CHECK_EQ(op_desc.Output("Out").size(), 1UL);
+  auto out_name = op_desc.Output("Out").front();
 
   auto x = ctx.GetVar(x_name);
   auto y = ctx.GetVar(y_name);
@@ -41,6 +41,6 @@ void FloorDivideOpMapper(const paddle::cpp::OpDesc& op_desc, const OpMapperConte
 }  // namespace cinn
 
 CINN_REGISTER_HELPER(paddle_floor_divide) {
-  CINN_REGISTER_OP_MAPPER(floor_divide, cinn::frontend::paddle_mappers::FloorDivideOpMapper)
+  CINN_REGISTER_OP_MAPPER(elementwise_floordiv, cinn::frontend::paddle_mappers::FloorDivideOpMapper)
   return true;
 }

@@ -20,29 +20,29 @@ import paddle
 class TestFloorDivideOp(OpMapperTest):
     def init_input_data(self):
         self.feed_data = {
-            'x': self.random([3], low=1, high=10, dtype='int32'),
-            'y': self.random([3], low=1, high=10, dtype='int32')
+            'X': self.random([3], low=1, high=10, dtype='int32'),
+            'Y': self.random([3], low=1, high=10, dtype='int32')
         }
 
     def set_op_type(self):
-        return "floor_divide"
+        return "elementwise_floordiv"
 
     def set_op_inputs(self):
         x = paddle.static.data(
-            name='x',
-            shape=self.feed_data['x'].shape,
-            dtype=self.feed_data['x'].dtype)
+            name='X',
+            shape=self.feed_data['X'].shape,
+            dtype=self.feed_data['X'].dtype)
         y = paddle.static.data(
-            name='y',
-            shape=self.feed_data['y'].shape,
-            dtype=self.feed_data['y'].dtype)
-        return {'x': [x], 'y': [y]}
+            name='Y',
+            shape=self.feed_data['Y'].shape,
+            dtype=self.feed_data['Y'].dtype)
+        return {'X': [x], 'Y': [y]}
 
     def set_op_attrs(self):
         return {}
 
     def set_op_outputs(self):
-        return {'out': [str(self.feed_data['x'].dtype)]}
+        return {'Out': [str(self.feed_data['X'].dtype)]}
 
     def test_check_results(self):
         self.check_outputs_and_grads(all_equal=True)
@@ -51,16 +51,16 @@ class TestFloorDivideOp(OpMapperTest):
 class TestFloorDivideCase1(TestFloorDivideOp):
     def init_input_data(self):
         self.feed_data = {
-            'x': self.random([3, 4], low=1, high=10, dtype='int64'),
-            'y': self.random([3, 4], low=1, high=10, dtype='int64')
+            'X': self.random([3, 4], low=1, high=10, dtype='int64'),
+            'Y': self.random([3, 4], low=1, high=10, dtype='int64')
         }
 
 
 class TestFloorDivideCase2(TestFloorDivideOp):
     def init_input_data(self):
         self.feed_data = {
-            'x': self.random([2, 3, 4], low=1, high=10, dtype='int64'),
-            'y': self.random([3, 4], low=1, high=10, dtype='int64')
+            'X': self.random([2, 3, 4], low=1, high=10, dtype='int64'),
+            'Y': self.random([3, 4], low=1, high=10, dtype='int64')
         }
 
 
