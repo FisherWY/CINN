@@ -326,7 +326,10 @@ std::vector<shape_t> InferShapeForFillConstant(const std::vector<shape_t> &input
                                                const framework::AttrMapType &attrs) {
   CHECK(attrs.count("shape"));
   auto shape = absl::get<std::vector<int>>(attrs.at("shape"));
-  CHECK(!shape.empty()) << "shape attr is empty!";
+  // CHECK(!shape.empty()) << "shape attr is empty!";
+  if (shape.empty()) {
+    return {{1}};
+  }
   return {shape};
 }
 

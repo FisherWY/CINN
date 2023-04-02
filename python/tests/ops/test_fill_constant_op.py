@@ -88,6 +88,13 @@ class TestFillConstantCase5(TestFillConstantOp):
         self.dtype = "int16"
 
 
+class TestFillConstantCase6(TestFillConstantOp):
+    def init_case(self):
+        self.shape = []
+        self.value = 1.0
+        self.dtype = "float32"
+
+
 class TestFillConstantStringValue(TestFillConstantOp):
     def init_case(self):
         self.shape = [32]
