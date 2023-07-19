@@ -31,7 +31,6 @@
 #include "cinn/utils/profiler.h"
 
 DECLARE_bool(cinn_ir_schedule);
-// DECLARE_int32(cinn_parallel_compile_size);
 
 namespace cinn {
 namespace hlir {

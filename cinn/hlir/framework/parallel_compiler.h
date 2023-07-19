@@ -35,7 +35,46 @@ class ParallelCompiler {
     std::vector<std::vector<ir::LoweredFunc>> lowered_funcs;
   };
 
- public:
+  struct CompilationResult {
+    // Lower result
+    std::vector<std::vector<ir::LoweredFunc>> lowered_funcs;
+    // Host/CUDA codegen result
+    std::vector<std::string> codegens;
+    // CUDA ptx result
+    std::vector<std::string> ptxs;
+    // Instruction result
+    std::vector<std::unique_ptr<Instruction>> instructions;
+  };
+
+  struct Task {
+    Task(ParallelCompiler* p,
+         std::shared_ptr<Scope>& s,
+         std::shared_ptr<Graph>& g,
+         const CompileOptions& cp,
+         const Target& t)
+        : compiler(p), scope(s), graph(g), options(cp), target(t) {}
+    void Lowering();
+    void CodegenAndJit();
+    void BuildInstruction();
+
+    const Target target;
+    ParallelCompiler* compiler;
+    std::shared_ptr<Scope> scope;
+    std::shared_ptr<Graph> graph;
+    const CompileOptions& options;
+
+    int start_gidx;
+    int stop_gidx;
+    std::vector<std::unique_ptr<Instruction>> instructions;
+    std::vector<std::vector<ir::LoweredFunc>> lowered_funcs;
+    std::vector<std::string> codegens;
+
+    std::unique_ptr<backends::ExecutionEngine> engine;
+#ifdef CINN_WITH_CUDA
+    std::unique_ptr<runtime::cuda::CUDAModule> cumodule;
+#endif
+  };
+
   explicit ParallelCompiler(std::shared_ptr<Scope>& scope,
                             std::shared_ptr<Graph>& graph,
                             const CompileOptions& option,
@@ -47,45 +86,10 @@ class ParallelCompiler {
  private:
   void SplitTask();
   void LaunchTask();
+  void RunTask(Task* task);
   std::vector<std::unique_ptr<Instruction>> MergeResult();
 
- public:
-  struct Task {
-   public:
-    Task(ParallelCompiler* p,
-         std::shared_ptr<Scope>& s,
-         std::shared_ptr<Graph>& g,
-         const CompileOptions& cp,
-         const Target& t)
-        : compiler(p), scope(s), graph(g), options(cp), target(t) {}
-    void Lowering();
-    void CodegenAndJit();
-    void BuildInstruction();
-
-   public:
-    const Target target;
-    ParallelCompiler* compiler;
-    std::shared_ptr<Scope> scope;
-    std::shared_ptr<Graph> graph;
-    const CompileOptions& options;
-
-    std::vector<int> gidx;
-    std::vector<std::unique_ptr<Instruction>> instructions;
-    std::vector<std::vector<ir::LoweredFunc>> lowered_funcs;
-
-   public:
-    std::unique_ptr<backends::ExecutionEngine> engine;
-#ifdef CINN_WITH_CUDA
-    std::unique_ptr<runtime::cuda::CUDAModule> cumodule;
-#endif
-  };
   std::vector<Task> tasks_;
-  int GetGroupIdx();
-
- private:
-  int index{0};
-  std::mutex mtx_;
-
   const common::Target target_;
   const CompileOptions& option_;
   std::shared_ptr<Scope> scope_;
