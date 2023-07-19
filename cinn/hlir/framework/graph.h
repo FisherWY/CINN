@@ -206,9 +206,6 @@ class Graph : public cinn::common::Graph {
   void VisualizeGroupedGraph(const std::vector<std::vector<Node*>>& groups,
                              const std::unordered_set<std::string>& fetch_var_ids = {});
 
-  void SaveSourceCode(const std::string& code);
-  void SavePTXCode(const std::string& ptx);
-
  private:
   std::string DebugGroupedGraph(const std::vector<std::vector<Node*>>& groups,
                                 const std::unordered_set<std::string>& fetch_var_ids = {});
@@ -220,9 +217,6 @@ class Graph : public cinn::common::Graph {
                                            const std::unordered_set<std::string>& fetch_var_ids = {});
 
   std::vector<std::vector<Node*>> FusionGroupsToGroups();
-
-  std::string viz_path_;
-  static std::atomic_size_t viz_count_;
 
   CINN_DISALLOW_COPY_AND_ASSIGN(Graph);
 };
