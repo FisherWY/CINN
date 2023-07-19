@@ -158,6 +158,8 @@ void ParallelCompiler::Task::CodegenAndJit() {
     CHECK(!cuda_c.empty()) << "Compile CUDA C code failed from device module:\n" << dmodule;
     source_codes.emplace_back(cuda_c);
 
+    cinn::backends::SourceCodePrint::GetInstance()->write(cuda_c);
+
     using runtime::cuda::CUDAModule;
     backends::nvrtc::Compiler compiler;
     auto ptx = compiler(cuda_c);
