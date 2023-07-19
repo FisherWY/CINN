@@ -32,16 +32,12 @@
 #include "gflags/gflags_declare.h"
 
 DECLARE_int32(cinn_parallel_compile_thread);
-DECLARE_string(cinn_dump_lower);
-DECLARE_string(cinn_dump_cuda);
-DECLARE_string(cinn_dump_ptx);
-DECLARE_string(cinn_dump_instruction);
 
 namespace cinn {
 namespace hlir {
 namespace framework {
 
-std::vector<std::unique_ptr<Instruction>> ParallelCompiler::operator()() {
+ParallelCompiler::CompilationResult ParallelCompiler::operator()() {
   if (graph_->fusion_groups.size() == 0) {
     hlir::framework::ApplyPasses(graph_.get(), {"BuildNonFusedGroupsPass"});
   }
@@ -96,11 +92,20 @@ void ParallelCompiler::LaunchTask() {
   }
 }
 
-std::vector<std::unique_ptr<Instruction>> ParallelCompiler::MergeResult() {
-  std::vector<std::unique_ptr<Instruction>> res;
+ParallelCompiler::CompilationResult ParallelCompiler::MergeResult() {
+  ParallelCompiler::CompilationResult res;
   for (auto& task : tasks_) {
+    for (auto& lowered_func : task.lowered_funcs) {
+      res.lowered_funcs.emplace_back(lowered_func);
+    }
+    for (auto& source_code : task.source_codes) {
+      res.source_codes.emplace_back(source_code);
+    }
+    for (auto& source_ptx : task.source_ptxs) {
+      res.source_ptxs.emplace_back(source_ptx);
+    }
     for (auto& instruction : task.instructions) {
-      res.emplace_back(std::move(instruction));
+      res.instructions.emplace_back(std::move(instruction));
     }
   }
   return std::move(res);
@@ -151,15 +156,13 @@ void ParallelCompiler::Task::CodegenAndJit() {
     backends::CodeGenCUDA_Dev codegen(target);
     auto cuda_c = codegen.Compile(dmodule);
     CHECK(!cuda_c.empty()) << "Compile CUDA C code failed from device module:\n" << dmodule;
-
-    cinn::backends::SourceCodePrint::GetInstance()->write(cuda_c);
-    graph->SaveSourceCode(cuda_c);
+    source_codes.emplace_back(cuda_c);
 
     using runtime::cuda::CUDAModule;
     backends::nvrtc::Compiler compiler;
     auto ptx = compiler(cuda_c);
     CHECK(!ptx.empty()) << "Compile PTX failed from source code:\n" << cuda_c;
-    graph->SavePTXCode(ptx);
+    source_ptxs.emplace_back(ptx);
     // load cumodule
     cumodule.reset(new CUDAModule(ptx, compiler.compile_to_cubin() ? CUDAModule::Kind::CUBIN : CUDAModule::Kind::PTX));
 

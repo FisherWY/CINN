@@ -39,9 +39,9 @@ class ParallelCompiler {
     // Lower result
     std::vector<std::vector<ir::LoweredFunc>> lowered_funcs;
     // Host/CUDA codegen result
-    std::vector<std::string> codegens;
+    std::vector<std::string> source_codes;
     // CUDA ptx result
-    std::vector<std::string> ptxs;
+    std::vector<std::string> source_ptxs;
     // Instruction result
     std::vector<std::unique_ptr<Instruction>> instructions;
   };
@@ -67,7 +67,8 @@ class ParallelCompiler {
     int stop_gidx;
     std::vector<std::unique_ptr<Instruction>> instructions;
     std::vector<std::vector<ir::LoweredFunc>> lowered_funcs;
-    std::vector<std::string> codegens;
+    std::vector<std::string> source_codes;
+    std::vector<std::string> source_ptxs;
 
     std::unique_ptr<backends::ExecutionEngine> engine;
 #ifdef CINN_WITH_CUDA
@@ -81,13 +82,13 @@ class ParallelCompiler {
                             const common::Target& target)
       : scope_(scope), graph_(graph), option_(option), target_(target) {}
   ~ParallelCompiler() {}
-  std::vector<std::unique_ptr<Instruction>> operator()();
+  CompilationResult operator()();
 
  private:
   void SplitTask();
   void LaunchTask();
   void RunTask(Task* task);
-  std::vector<std::unique_ptr<Instruction>> MergeResult();
+  CompilationResult MergeResult();
 
   std::vector<Task> tasks_;
   const common::Target target_;
