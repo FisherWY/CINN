@@ -277,6 +277,29 @@ void Instruction::Run(const std::map<std::string, cinn_pod_value_t>* name2podarg
   //   }
 }
 
+std::string Instruction::DumpInstruction() {
+  std::stringstream ss;
+  ss << "Instruction {" << std::endl;
+  for (size_t i = 0; i < fn_names_.size(); ++i) {
+    ss << "  Function " << fn_names_[i] << ":" << std::endl;
+    ss << "    function ptr: " << fn_ptrs_[i] << std::endl;
+
+    auto in_arg = in_args_[i];
+    std::sort(in_arg.begin(), in_arg.end());
+    for (auto& in_name : in_arg) {
+      ss << "    input: " << in_name << std::endl;
+    }
+
+    auto out_arg = out_args_[i];
+    std::sort(out_arg.begin(), out_arg.end());
+    for (auto& out_name : out_arg) {
+      ss << "    output: " << out_name << std::endl;
+    }
+  }
+  ss << "}" << std::endl;
+  return ss.str();
+}
+
 void Instruction::CheckResults(const std::map<std::string, cinn_pod_value_t>* name2podargs, void* stream) {
 #ifdef CINN_WITH_CUDA
   cudaStreamSynchronize(static_cast<cudaStream_t>(stream));

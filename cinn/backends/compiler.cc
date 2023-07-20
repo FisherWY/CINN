@@ -123,9 +123,7 @@ void DumpCompilationInfo::DumpInstruction() {
       VLOG(7) << "Dump instruction to: " << dump_file;
       std::ofstream of(dump_file, std::ios_base::out);
       if (of.is_open()) {
-        for (auto fn_name : info_.instructions[idx]->GetFnNames()) {
-          of << fn_name << std::endl;
-        }
+        of << info_.instructions[idx]->DumpInstruction();
       } else {
         LOG(WARNING) << "Failed to open file: " << dump_file << ", please check your path.";
       }
