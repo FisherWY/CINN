@@ -16,6 +16,7 @@
 
 #include <gtest/gtest.h>
 
+#include "cinn/common/target.h"
 #include "cinn/frontend/net_builder.h"
 #include "cinn/frontend/optimize.h"
 #include "cinn/frontend/program_pass.h"
@@ -207,6 +208,78 @@ TEST(GraphCompilerTest, TestCublas) {
   RunCublas(64, 128, 128, false, true);
   RunCublas(64, 128, 128, true, false);
   RunCublas(64, 128, 128, true, true);
+}
+
+TEST(GraphCompilerTest, TestLowering) {
+  frontend::NetBuilder builder("test_lowering_on_graph_compiler");
+  auto a = builder.CreateInput(Float(32), {1, 64, 112, 112}, "A");
+  auto b = builder.CreateInput(Float(32), {64}, "B");
+
+  auto c = builder.Add(a, b, 1);
+  auto d = builder.Relu(c);
+
+  auto target  = common::DefaultNVGPUTarget();
+  auto program = builder.Build();
+  auto graph   = Optimize(&program, {}, target);
+  auto scope   = BuildScope(target, graph);
+
+  GraphCompiler gc(target, scope, graph);
+  GraphCompiler::CompileOptions options;
+  GraphCompiler::CompilationResult result = gc.Lowering(options);
+
+  LOG(INFO) << "Runtime program status: " << (result.runtime_program.get() == nullptr);
+  LOG(INFO) << "Lowered function size: " << result.lowered_funcs.size();
+  LOG(INFO) << "Source code size: " << result.source_codes.size();
+  LOG(INFO) << "Source ptx size: " << result.source_ptxs.size();
+  LOG(INFO) << "Instruction size: " << result.instructions.size();
+}
+
+TEST(GraphCompilerTest, TestCodegenAndJit) {
+  frontend::NetBuilder builder("test_codegen_and_jit_on_graph_compiler");
+  auto a = builder.CreateInput(Float(32), {1, 64, 112, 112}, "A");
+  auto b = builder.CreateInput(Float(32), {64}, "B");
+
+  auto c = builder.Add(a, b, 1);
+  auto d = builder.Relu(c);
+
+  auto target  = common::DefaultNVGPUTarget();
+  auto program = builder.Build();
+  auto graph   = Optimize(&program, {}, target);
+  auto scope   = BuildScope(target, graph);
+
+  GraphCompiler gc(target, scope, graph);
+  GraphCompiler::CompileOptions options;
+  GraphCompiler::CompilationResult result = gc.CodegenAndJit(options);
+
+  LOG(INFO) << "Runtime program status: " << (result.runtime_program.get() == nullptr);
+  LOG(INFO) << "Lowered function size: " << result.lowered_funcs.size();
+  LOG(INFO) << "Source code size: " << result.source_codes.size();
+  LOG(INFO) << "Source ptx size: " << result.source_ptxs.size();
+  LOG(INFO) << "Instruction size: " << result.instructions.size();
+}
+
+TEST(GraphCompilerTest, TestBuildInstruction) {
+  frontend::NetBuilder builder("test_build_instruction_on_graph_compiler");
+  auto a = builder.CreateInput(Float(32), {1, 64, 112, 112}, "A");
+  auto b = builder.CreateInput(Float(32), {64}, "B");
+
+  auto c = builder.Add(a, b, 1);
+  auto d = builder.Relu(c);
+
+  auto target  = common::DefaultNVGPUTarget();
+  auto program = builder.Build();
+  auto graph   = Optimize(&program, {}, target);
+  auto scope   = BuildScope(target, graph);
+
+  GraphCompiler gc(target, scope, graph);
+  GraphCompiler::CompileOptions options;
+  GraphCompiler::CompilationResult result = gc.BuildInstruction(options);
+
+  LOG(INFO) << "Runtime program status: " << (result.runtime_program.get() == nullptr);
+  LOG(INFO) << "Lowered function size: " << result.lowered_funcs.size();
+  LOG(INFO) << "Source code size: " << result.source_codes.size();
+  LOG(INFO) << "Source ptx size: " << result.source_ptxs.size();
+  LOG(INFO) << "Instruction size: " << result.instructions.size();
 }
 
 #endif

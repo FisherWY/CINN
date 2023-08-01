@@ -24,6 +24,7 @@
 #include "cinn/common/context.h"
 #include "cinn/hlir/framework/instruction.h"
 #include "cinn/hlir/framework/op_lowering_util.h"
+#include "cinn/hlir/framework/parallel_compiler.h"
 #include "cinn/hlir/framework/tensor.h"
 #include "cinn/hlir/pe/schedule.h"
 #include "cinn/lang/lower.h"
@@ -275,6 +276,7 @@ GraphCompiler::CompilationResult GraphCompiler::Build(const GraphCompiler::Compi
   utils::RecordEvent("GraphCompiler CompileResult", utils::EventType::kOrdinary);
   ParallelCompiler::CompileOptions option;
   option.lowered_funcs = options.lowered_funcs;
+  option.stage         = options.stage;
 
   parallel_compiler_ = std::make_shared<ParallelCompiler>(scope_, graph_, option, target_);
   auto result        = (*parallel_compiler_.get())();
@@ -294,6 +296,71 @@ GraphCompiler::CompilationResult GraphCompiler::Build(const GraphCompiler::Compi
 
   GraphCompiler::CompilationResult compilation_result;
   compilation_result.runtime_program.reset(new Program(scope_, std::move(result.instructions)));
+  compilation_result.lowered_funcs = std::move(result.lowered_funcs);
+  compilation_result.source_codes  = std::move(result.source_codes);
+  compilation_result.source_ptxs   = std::move(result.source_ptxs);
+  return compilation_result;
+}
+
+GraphCompiler::CompilationResult GraphCompiler::Lowering(const CompileOptions& options,
+                                                         std::unordered_set<std::string>&& fetch_var_ids,
+                                                         void* stream) {
+  // Global setting
+  Context::Global().ResetNameId();
+  // Setting compile options
+  VLOG(2) << "Compile With Parallel Compiler! But just lowering!";
+  ParallelCompiler::CompileOptions option;
+  option.lowered_funcs = options.lowered_funcs;
+  option.stage         = ParallelCompiler::Stage::LOWERING;
+  // Compile with parallel compiler
+  parallel_compiler_ = std::make_shared<ParallelCompiler>(scope_, graph_, option, target_);
+  auto result        = (*parallel_compiler_.get())();
+  // Get compile result
+  GraphCompiler::CompilationResult compilation_result;
+  compilation_result.lowered_funcs = std::move(result.lowered_funcs);
+  return compilation_result;
+}
+
+GraphCompiler::CompilationResult GraphCompiler::CodegenAndJit(const CompileOptions& options,
+                                                              std::unordered_set<std::string>&& fetch_var_ids,
+                                                              void* stream) {
+  // Global setting
+  Context::Global().ResetNameId();
+  // Setting compile options
+  VLOG(2) << "Compile With Parallel Compiler! But just codegen and jit!";
+  ParallelCompiler::CompileOptions option;
+  option.lowered_funcs = options.lowered_funcs;
+  option.stage         = ParallelCompiler::Stage::CODEGEN_AND_JIT;
+  // Compile with parallel compiler
+  parallel_compiler_ = std::make_shared<ParallelCompiler>(scope_, graph_, option, target_);
+  auto result        = (*parallel_compiler_.get())();
+  // Get compile result
+  GraphCompiler::CompilationResult compilation_result;
+  compilation_result.lowered_funcs = std::move(result.lowered_funcs);
+  compilation_result.source_codes  = std::move(result.source_codes);
+  compilation_result.source_ptxs   = std::move(result.source_ptxs);
+  return compilation_result;
+}
+
+GraphCompiler::CompilationResult GraphCompiler::BuildInstruction(const CompileOptions& options,
+                                                                 std::unordered_set<std::string>&& fetch_var_ids,
+                                                                 void* stream) {
+  // Global setting
+  Context::Global().ResetNameId();
+  // Setting compile options
+  VLOG(2) << "Compile With Parallel Compiler! But just build instruction!";
+  ParallelCompiler::CompileOptions option;
+  option.lowered_funcs = options.lowered_funcs;
+  option.stage         = ParallelCompiler::Stage::BUILD_INSTRUCTION;
+  // Compile with parallel compiler
+  parallel_compiler_ = std::make_shared<ParallelCompiler>(scope_, graph_, option, target_);
+  auto result        = (*parallel_compiler_.get())();
+  // Get compile result
+  GraphCompiler::CompilationResult compilation_result;
+  compilation_result.lowered_funcs = std::move(result.lowered_funcs);
+  compilation_result.source_codes  = std::move(result.source_codes);
+  compilation_result.source_ptxs   = std::move(result.source_ptxs);
+  compilation_result.instructions  = std::move(result.instructions);
   return compilation_result;
 }
 
