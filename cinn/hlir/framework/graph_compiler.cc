@@ -246,94 +246,89 @@ void Program::ExecuteTest(int repeat_) {
 
 std::unique_ptr<Program> GraphCompiler::Build(const std::string& code) {
   utils::RecordEvent("GraphCompiler::Build", utils::EventType::kGraph);
-  GraphCompiler::CompileOptions options;
-  options.attached_code              = code;
-  options.with_instantiate_variables = true;
+  compilation_context_.attached_code              = code;
+  compilation_context_.with_instantiate_variables = true;
 
-  auto&& result = Build(options);
+  auto&& result = Build(&compilation_context_);
   return std::move(result.runtime_program);
 }
 
-void GraphCompiler::CompileOptions::Apply(const auto_schedule::TuningResult& tuning_result) {
+void GraphCompiler::CompilationContext::Apply(const auto_schedule::TuningResult& tuning_result) {
   // assign options with TuningResult directly
   groups.assign(tuning_result.subgraphs.begin(), tuning_result.subgraphs.end());
   lowered_funcs.assign(tuning_result.function_groups.begin(), tuning_result.function_groups.end());
 }
 
-GraphCompiler::CompilationResult GraphCompiler::Build(const GraphCompiler::CompileOptions& options,
-                                                      std::unordered_set<std::string>&& fetch_var_ids,
-                                                      void* stream) {
+GraphCompiler::CompilationResult GraphCompiler::Build(GraphCompiler::CompilationContext* context) {
   Context::Global().ResetNameId();
 
   // write group's information into FLAGS_cinn_fusion_groups_graphviz_dir
-  graph_->VisualizeGroupedGraph(fetch_var_ids.empty() ? fetch_var_ids_ : fetch_var_ids);
+  context->graph->VisualizeGroupedGraph(context->fetch_var_ids);
 
-  if (options.with_instantiate_variables) {
-    InstantiateVariables();
+  if (context->with_instantiate_variables) {
+    InstantiateVariables(context);
   }
 
   VLOG(2) << "Compile With Parallel Compiler!";
   utils::RecordEvent("GraphCompiler CompileResult", utils::EventType::kOrdinary);
   ParallelCompiler::CompileOptions option;
-  option.lowered_funcs = options.lowered_funcs;
-  option.stage         = options.stage;
+  option.lowered_funcs = context->lowered_funcs;
+  option.stage         = context->stage;
 
-  parallel_compiler_ = std::make_shared<ParallelCompiler>(scope_, graph_, option, target_);
+  parallel_compiler_ = std::make_shared<ParallelCompiler>(context->scope, context->graph, option, context->target);
   auto result        = (*parallel_compiler_.get())();
 
   // Dump compilation result
   backends::DumpCompilationInfo dumper(result);
 
-  if (options.remove_unused_variables) {
-    RemoveInvalidVariables(result.instructions);
+  if (context->remove_unused_variables) {
+    RemoveInvalidVariables(context, result.instructions);
   }
 
-  if (options.with_buffer_handle_instruction_inserted) {
+  if (context->with_buffer_handle_instruction_inserted) {
     VLOG(3) << "option.with_buffer_handle_instruction_inserted enable";
-    InsertBufferHandlers(&result.instructions);
+    InsertBufferHandlers(context, &result.instructions);
   }
   VLOG(2) << "Compile With Parallel Compiler Done!";
 
   GraphCompiler::CompilationResult compilation_result;
-  compilation_result.runtime_program.reset(new Program(scope_, std::move(result.instructions)));
+  compilation_result.runtime_program.reset(new Program(context->scope, std::move(result.instructions)));
   compilation_result.lowered_funcs = std::move(result.lowered_funcs);
   compilation_result.source_codes  = std::move(result.source_codes);
   compilation_result.source_ptxs   = std::move(result.source_ptxs);
   return compilation_result;
 }
 
-GraphCompiler::CompilationResult GraphCompiler::Lowering(const CompileOptions& options,
-                                                         std::unordered_set<std::string>&& fetch_var_ids,
-                                                         void* stream) {
+GraphCompiler::CompilationResult GraphCompiler::Lowering() {
   // Global setting
   Context::Global().ResetNameId();
   // Setting compile options
   VLOG(2) << "Compile With Parallel Compiler! But just lowering!";
   ParallelCompiler::CompileOptions option;
-  option.lowered_funcs = options.lowered_funcs;
+  option.lowered_funcs = compilation_context_.lowered_funcs;
   option.stage         = ParallelCompiler::Stage::LOWERING;
   // Compile with parallel compiler
-  parallel_compiler_ = std::make_shared<ParallelCompiler>(scope_, graph_, option, target_);
-  auto result        = (*parallel_compiler_.get())();
+  parallel_compiler_ = std::make_shared<ParallelCompiler>(
+      compilation_context_.scope, compilation_context_.graph, option, compilation_context_.target);
+  auto result = (*parallel_compiler_.get())();
   // Get compile result
   GraphCompiler::CompilationResult compilation_result;
   compilation_result.lowered_funcs = std::move(result.lowered_funcs);
   return compilation_result;
 }
 
-GraphCompiler::CompilationResult GraphCompiler::CodegenAndJit(const CompileOptions& options,
-                                                              std::unordered_set<std::string>&& fetch_var_ids,
-                                                              void* stream) {
+GraphCompiler::CompilationResult GraphCompiler::CodegenAndJit() {
   // Global setting
   Context::Global().ResetNameId();
   // Setting compile options
   VLOG(2) << "Compile With Parallel Compiler! But just codegen and jit!";
   ParallelCompiler::CompileOptions option;
-  option.lowered_funcs = options.lowered_funcs;
+  option.lowered_funcs = compilation_context_.lowered_funcs;
   option.stage         = ParallelCompiler::Stage::CODEGEN_AND_JIT;
   // Compile with parallel compiler
-  parallel_compiler_ = std::make_shared<ParallelCompiler>(scope_, graph_, option, target_);
-  auto result        = (*parallel_compiler_.get())();
+  parallel_compiler_ = std::make_shared<ParallelCompiler>(
+      compilation_context_.scope, compilation_context_.graph, option, compilation_context_.target);
+  auto result = (*parallel_compiler_.get())();
   // Get compile result
   GraphCompiler::CompilationResult compilation_result;
   compilation_result.lowered_funcs = std::move(result.lowered_funcs);
@@ -342,19 +337,18 @@ GraphCompiler::CompilationResult GraphCompiler::CodegenAndJit(const CompileOptio
   return compilation_result;
 }
 
-GraphCompiler::CompilationResult GraphCompiler::BuildInstruction(const CompileOptions& options,
-                                                                 std::unordered_set<std::string>&& fetch_var_ids,
-                                                                 void* stream) {
+GraphCompiler::CompilationResult GraphCompiler::BuildInstruction() {
   // Global setting
   Context::Global().ResetNameId();
   // Setting compile options
   VLOG(2) << "Compile With Parallel Compiler! But just build instruction!";
   ParallelCompiler::CompileOptions option;
-  option.lowered_funcs = options.lowered_funcs;
+  option.lowered_funcs = compilation_context_.lowered_funcs;
   option.stage         = ParallelCompiler::Stage::BUILD_INSTRUCTION;
   // Compile with parallel compiler
-  parallel_compiler_ = std::make_shared<ParallelCompiler>(scope_, graph_, option, target_);
-  auto result        = (*parallel_compiler_.get())();
+  parallel_compiler_ = std::make_shared<ParallelCompiler>(
+      compilation_context_.scope, compilation_context_.graph, option, compilation_context_.target);
+  auto result = (*parallel_compiler_.get())();
   // Get compile result
   GraphCompiler::CompilationResult compilation_result;
   compilation_result.lowered_funcs = std::move(result.lowered_funcs);
@@ -364,29 +358,30 @@ GraphCompiler::CompilationResult GraphCompiler::BuildInstruction(const CompileOp
   return compilation_result;
 }
 
-void GraphCompiler::InstantiateVariables() {
+void GraphCompiler::InstantiateVariables(CompilationContext* context) {
   VLOG(3) << "Instantiate all variables on compile-time";
   utils::RecordEvent("GraphCompiler MutableData", utils::EventType::kOrdinary);
   // All variables reside in scope_, so traverse it to instantiate each one
-  for (auto& name : scope_->var_names()) {
-    auto* var    = scope_->Var<Tensor>(std::string({name.data(), name.size()}));
+  for (auto& name : context->scope->var_names()) {
+    auto* var    = context->scope->Var<Tensor>(std::string({name.data(), name.size()}));
     auto& tensor = absl::get<Tensor>(*var);
-    if (reuse_vars_map_.count(name)) {
-      auto src_var_name = reuse_vars_map_.at(name);
-      auto* src_var     = scope_->Var<Tensor>(src_var_name);
+    if (context->reuse_vars_map.count(name)) {
+      auto src_var_name = context->reuse_vars_map.at(name);
+      auto* src_var     = context->scope->Var<Tensor>(src_var_name);
       auto& src_tensor  = absl::get<Tensor>(*src_var);
       tensor->set_buffer(src_tensor->get_buffer());
     } else {
-      tensor->mutable_data(target_, tensor->type());
+      tensor->mutable_data(context->target, tensor->type());
     }
   }
 }
 
-void GraphCompiler::RemoveInvalidVariables(const std::vector<std::unique_ptr<Instruction>>& instructions) {
+void GraphCompiler::RemoveInvalidVariables(CompilationContext* context,
+                                           const std::vector<std::unique_ptr<Instruction>>& instructions) {
   // mark all variables are invalid initially
   utils::RecordEvent("GraphCompiler RemoveInvalidVariables", utils::EventType::kOrdinary);
   std::unordered_set<std::string> invalid_variables;
-  auto var_names = scope_->var_names();
+  auto var_names = context->scope->var_names();
   invalid_variables.reserve(var_names.size());
   std::transform(var_names.begin(),
                  var_names.end(),
@@ -417,8 +412,8 @@ void GraphCompiler::RemoveInvalidVariables(const std::vector<std::unique_ptr<Ins
   }
 
   VLOG(3) << "There are " << unused_var_num << " invalid variables to be removed from scope";
-  std::for_each(invalid_variables.begin(), invalid_variables.end(), [this](const std::string& var_name) {
-    scope_->EraseVar(var_name);
+  std::for_each(invalid_variables.begin(), invalid_variables.end(), [context](const std::string& var_name) {
+    context->scope->EraseVar(var_name);
     VLOG(3) << "Variable(" << var_name << ") is erased";
   });
 }
@@ -473,7 +468,8 @@ void GraphCompiler::AnalyzeVariableLifeTime(const std::vector<std::unique_ptr<In
   }
 }
 
-void GraphCompiler::InsertBufferHandlers(std::vector<std::unique_ptr<Instruction>>* instructions) {
+void GraphCompiler::InsertBufferHandlers(CompilationContext* context,
+                                         std::vector<std::unique_ptr<Instruction>>* instructions) {
   utils::RecordEvent("GraphCompiler InsertBufferHandlers", utils::EventType::kOrdinary);
   std::unordered_map<int, std::vector<std::string>> step2malloc, step2free;
   AnalyzeVariableLifeTime(*instructions, &step2malloc, &step2free);
@@ -488,8 +484,11 @@ void GraphCompiler::InsertBufferHandlers(std::vector<std::unique_ptr<Instruction
     if (m_it != step2malloc.end()) {
       const auto& malloc_var_names = m_it->second;
       auto function_name           = "malloc_buffer_instruction_" + std::to_string(step);
-      auto malloc_instr            = std::make_unique<Instruction>(
-          common::DefaultHostTarget(), scope_.get(), malloc_var_names, std::vector<std::string>({}), function_name);
+      auto malloc_instr            = std::make_unique<Instruction>(common::DefaultHostTarget(),
+                                                        context->scope.get(),
+                                                        malloc_var_names,
+                                                        std::vector<std::string>({}),
+                                                        function_name);
       VLOG(4) << "seting malloc function " << function_name << " for var " << cinn::utils::Join(malloc_var_names, ", ");
       malloc_instr->SetLoweredFunc(reinterpret_cast<void*>(BufferMallocWithCallback), function_name);
       malloc_instr->Finalize();
@@ -505,8 +504,11 @@ void GraphCompiler::InsertBufferHandlers(std::vector<std::unique_ptr<Instruction
     if (f_it != step2free.end()) {
       const auto& free_var_names = f_it->second;
       auto function_name         = "free_buffer_instruction_" + std::to_string(step);
-      auto free_instr            = std::make_unique<Instruction>(
-          common::DefaultHostTarget(), scope_.get(), std::vector<std::string>({}), free_var_names, function_name);
+      auto free_instr            = std::make_unique<Instruction>(common::DefaultHostTarget(),
+                                                      context->scope.get(),
+                                                      std::vector<std::string>({}),
+                                                      free_var_names,
+                                                      function_name);
       VLOG(4) << "setting free function " << function_name << " for var " << cinn::utils::Join(free_var_names, ", ");
       free_instr->SetLoweredFunc(reinterpret_cast<void*>(BufferFreeWithCallback), function_name);
       free_instr->Finalize();
