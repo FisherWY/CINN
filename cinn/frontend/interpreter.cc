@@ -113,18 +113,18 @@ void Interpreter::Impl::Build(const Target& target, const std::string& model_nam
   graph->attrs["model_name"] = std::make_shared<absl::any>(model_name);
   scope_                     = hlir::framework::BuildScope(target, graph, scope_);
 
-  graph_compiler_.reset(new hlir::framework::GraphCompiler(target, scope_, graph));
-  hlir::framework::GraphCompiler::CompileOptions options;
-  options.with_instantiate_variables = true;
+  hlir::framework::GraphCompiler::CompilationContext context(graph, scope_, target);
+  context.with_instantiate_variables = true;
   if (FLAGS_enable_auto_tuner) {
     VLOG(4) << "Compile with auto-tune";
     auto_schedule::AutoTuner auto_tuner(target, graph.get());
     auto_tuner.Initialize(auto_schedule::AutoTuner::Config(), graph_compiler_.get());
     auto_schedule::TuningOptions tuning_options;
     auto_schedule::TuningResult tuning_result = auto_tuner.Tune(tuning_options);
-    options.Apply(tuning_result);
+    context.Apply(tuning_result);
   }
-  runtime_program_ = graph_compiler_->Build(options, std::move(fetch_var_ids)).runtime_program;
+  graph_compiler_.reset(new hlir::framework::GraphCompiler(context));
+  runtime_program_ = graph_compiler_->Build();
   runtime_program_->PreRun();
 }
 

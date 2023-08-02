@@ -62,10 +62,11 @@ class TestMeasurer : public ::testing::Test {
     Target target = common::DefaultHostTarget();
 #endif
     std::unordered_set<std::string> fetch_ids;
-    auto program   = CreateAddReluProgram();
-    auto graph     = cinn::frontend::Optimize(&program, fetch_ids, target);
-    auto scope     = BuildScope(target, graph);
-    graph_compiler = std::make_unique<GraphCompiler>(target, scope, graph);
+    auto program = CreateAddReluProgram();
+    auto graph   = cinn::frontend::Optimize(&program, fetch_ids, target);
+    auto scope   = BuildScope(target, graph);
+    GraphCompiler::CompilationContext context(graph, scope, target);
+    graph_compiler = std::make_unique<GraphCompiler>(context);
     TaskCreator task_creator;
     tasks                  = task_creator.CreateTuneTaskOpLevel(graph.get());
     const auto& dtype_dict = graph->GetAttrs<absl::flat_hash_map<std::string, common::Type>>("inferdtype");

@@ -40,7 +40,8 @@ void RunModelTest(Program& program,
     hlir::framework::ApplyPass(graph.get(), "FusionMergePass");
 
     auto scope = BuildScope(target, graph);
-    hlir::framework::GraphCompiler gc(target, scope, graph);
+    hlir::framework::GraphCompiler::CompilationContext context(graph, scope, target);
+    hlir::framework::GraphCompiler gc(context);
     auto run_program = gc.Build();
 
     for (int idx = 0; idx < inputs.size(); ++idx) {
@@ -64,7 +65,8 @@ void RunModelTest(Program& program,
     hlir::framework::ApplyPass(graph.get(), "FusionMergePass");
 
     auto scope = BuildScope(target, graph);
-    hlir::framework::GraphCompiler gc(target, scope, graph);
+    hlir::framework::GraphCompiler::CompilationContext context(graph, scope, target);
+    hlir::framework::GraphCompiler gc(context);
     auto run_program = gc.Build();
 
     for (int idx = 0; idx < inputs.size(); ++idx) {

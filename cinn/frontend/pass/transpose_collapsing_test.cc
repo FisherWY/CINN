@@ -63,7 +63,8 @@ std::vector<std::vector<float>> RunWithProgram(const Program& program,
 
   hlir::framework::ApplyPasses(graph.get(), {"InferShape", "OpFusionPass"});
   VLOG(1) << "graph:\n" << graph->Visualize();
-  hlir::framework::GraphCompiler gc(target, scope, graph);
+  hlir::framework::GraphCompiler::CompilationContext context(graph, scope, target);
+  hlir::framework::GraphCompiler gc(context);
   auto runtime_program = gc.Build();
   runtime_program->Execute();
 

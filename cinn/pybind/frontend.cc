@@ -180,15 +180,14 @@ void BindFrontend(pybind11::module *m) {
             auto graph = Optimize(&self, fetch_ids, target, passes);
 
             scope = hlir::framework::BuildScope(target, graph, scope);
-            hlir::framework::GraphCompiler gc(target, scope, graph);
+            hlir::framework::GraphCompiler::CompilationContext context(graph, scope, target);
 
             // Keep compile option same as paddle
-            hlir::framework::GraphCompiler::CompileOptions options;
-            options.with_instantiate_variables = true;
-            options.remove_unused_variables    = false;
-            auto gc_fetch_ids                  = fetch_ids;
-            const auto &result                 = gc.Build(options, std::move(gc_fetch_ids));
-            const auto &program                = result.runtime_program;
+            context.with_instantiate_variables = true;
+            context.remove_unused_variables    = false;
+            context.fetch_var_ids              = fetch_ids;
+            hlir::framework::GraphCompiler gc(context);
+            const auto &program = gc.Build();
 
             for (size_t i = 0; i < tensor_inputs.size(); i++) {
               auto in_tensor = scope->GetTensor(tensor_inputs[i]->id);
@@ -270,7 +269,8 @@ void BindFrontend(pybind11::module *m) {
              std::shared_ptr<hlir::framework::Graph> g(new hlir::framework::Graph(self, target));
              hlir::framework::ApplyPass(g.get(), "InferShape");
              std::shared_ptr<hlir::framework::Scope> scope = hlir::framework::BuildScope(target, g);
-             hlir::framework::GraphCompiler gc(target, scope, g);
+             hlir::framework::GraphCompiler::CompilationContext context(g, scope, target);
+             hlir::framework::GraphCompiler gc(context);
              auto program = gc.Build();
              for (size_t i = 0; i < tensor_inputs.size(); i++) {
                auto in_tensor = scope->GetTensor(tensor_inputs[i]->id);
@@ -314,8 +314,8 @@ void BindFrontend(pybind11::module *m) {
              std::unordered_set<std::string> fetch_ids;
              auto graph                                    = cinn::frontend::Optimize(&self, fetch_ids, target);
              std::shared_ptr<hlir::framework::Scope> scope = hlir::framework::BuildScope(target, graph);
-
-             hlir::framework::GraphCompiler gc(target, scope, graph);
+             hlir::framework::GraphCompiler::CompilationContext context(graph, scope, target);
+             hlir::framework::GraphCompiler gc(context);
              auto program = gc.Build(code);
              for (size_t i = 0; i < tensor_inputs.size(); i++) {
                auto in_tensor = scope->GetTensor(tensor_inputs[i]->id);
