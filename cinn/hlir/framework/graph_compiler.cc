@@ -279,7 +279,7 @@ GraphCompiler::CompilationResult GraphCompiler::Build(GraphCompiler::Compilation
   auto result        = (*parallel_compiler_.get())();
 
   // Dump compilation result
-  backends::DumpCompilationInfo dumper(result);
+  backends::CompilationInfoDumper dumper(result);
 
   if (context->remove_unused_variables) {
     RemoveInvalidVariables(context, result.instructions);

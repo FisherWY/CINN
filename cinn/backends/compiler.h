@@ -40,9 +40,9 @@ namespace backends {
  * Use FLAGS_cinn_dump_group_ptx to specify the directory to dump ptx.
  * Use FLAGS_cinn_dump_group_instruction to specify the directory to dump instruction.
  */
-class DumpCompilationInfo {
+class CompilationInfoDumper {
  public:
-  explicit DumpCompilationInfo(hlir::framework::ParallelCompiler::CompilationResult& info) : info_(info) {
+  explicit CompilationInfoDumper(hlir::framework::ParallelCompiler::CompilationResult& info) : info_(info) {
     DumpLoweredFunc();
     DumpSourceCode();
     DumpPtxCode();
@@ -54,6 +54,7 @@ class DumpCompilationInfo {
   void DumpSourceCode();
   void DumpPtxCode();
   void DumpInstruction();
+  void Dump(const std::string& base_path, const int idx, const std::string& file_name, const std::string& content);
 
   hlir::framework::ParallelCompiler::CompilationResult& info_;
 };
